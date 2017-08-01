@@ -1,0 +1,482 @@
+---
+title: "Characrtistics Evaluation of Cypress Ck nr Westfield"
+author: "Vahid Salahi"
+date: "February 3, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r, results='asis', echo=FALSE}
+cat("\\newpage")
+```
+&nbsp;  
+&nbsp;  
+&nbsp;  
+&nbsp;  
+
+# Downloading and cleaning data
+
+---  
+
+The peak annual stream-flow and daily stream-flow data for USGS 08069000 Cypress Ck nr Westfield, TX were downloaded for performing necessary analysis. R programming is used for this aim and parts of the code are presented in this report to illustrate R programming usage in stochastic approach of data analysis. All the materials (data and codes) can be found [here](https://github.com/vsalahi "github").  
+&nbsp;  
+
+First, the answer to the following question is investigated:
+
+* Is there a temporal trend in peak flows?  
+
+
+To see if there is any temporal trend for the peak flow data, the time series of annual peak stream-flow data were plotted and the regression line was obtained. The temporal peak flow data was plotted as follows:
+
+
+\vspace{20pt}
+
+```{r chunk_name, echo=FALSE, results='hide',message=FALSE, warning=FALSE}
+
+l <-library(MASS)
+l<- library(extRemes)
+l<-library(fitdistrplus)
+l<-library(evd)
+l<-library(Kendall)
+l<-library(GEVcdn)
+
+setwd("C:\\Users\\vahid\\Dropbox\\GraduateStudies\\Semester 6\\SurfaceWaterHydrology\\Module1\\RCode")
+pf <- read.csv("PeakWest.csv")
+hydyear <- pf[,5]
+peakflow <- pf[,4]
+dat <- as.data.frame(cbind(hydyear,peakflow))
+peakflow.sort <- sort(peakflow)
+
+plot(hydyear,peakflow,type="o", ylab="Peak Flow (csf)",xlab="Year",col="red")
+#lines(hydyear,peakflow,type="o",lty=2,col="red")
+title("Temporal Peak Flow")
+lm <- lm(peakflow ~ hydyear) # regression line
+abline(lm,col="blue") # plot the regression line
+b <- c("Peak Flow", "Regression Line")
+grid()
+legend("topright", b , col=c("red", "blue"), bty="n",pch=c(1,NA),lty=c(1,1))
+```
+
+
+The regression line appears to have a very small slope which means there is no temporal trend in the data. The summary of the regression line shows a p-value of $0.7707$ which indicates no correlation for the time series. P-value for this regression line is presented in the last line of the summary function.
+
+
+```{r}
+# "lm" is the regression line
+summary(lm)
+```
+  
+&nbsp;  
+  
+  
+By looking at the data we notice that the first point of the data has very high value and after that for several years there is no data reported. Therefore, the first two points of the data have been excluded to see how the regression line looks like. Regression line is very sensitive to outliers.
+
+
+```{r, echo=FALSE, results='hide',message=FALSE, warning=FALSE}
+plot(hydyear[3:73],peakflow[3:73],type="o", ylab="Peak Flow (csf)",xlab="Year",col="red")
+title("Temporal Peak Flow (without outliers)")
+lm <- lm(peakflow[3:73] ~ hydyear[3:73])
+abline(lm,col="blue")
+b <- c("Peak Flow", "Regression Line")
+grid()
+legend("topright", b , col=c("red", "blue"), bty="n",pch=c(1,NA),lty=c(1,1))
+```
+&nbsp;  
+
+Above, the straight line with a significant positive slope can be observed, which implies positive temporal trend in the time series. Summary of the regression line shows p-value of $0.01693$ which indicates a strong correlation in the time series.
+
+
+```{r}
+summary(lm)
+```
+
+&nbsp;  
+
+
+The Mann-Kendall trend test is another tool that can be used for monotonic trend analysis in a time series. A p-value of $0.006353$ is obtained from this test which means a significant correlation in time series. 
+
+\vspace{20pt}
+
+```{r}
+MannKendall(peakflow)
+```
+
+&nbsp;  
+
+Based on this analysis, it can be concluded that the time series is non-stationary. This is due to a significant trend in temporal data which indicates change in statistics properties such as mean and variance. The time series has a positive trend meaning increase in peak flow data  
+
+<br> 
+
+### Empirical Cumulative Distribution Function 
+
+---  
+
+Assuming stationarity in the peak flow data, a cumulative distribution function was drawn assuming Gringorten Plotting position. The following piece of code shows the Gringorten function which has been applied on the data to draw the cumulative distribution function:
+
+```{r}
+
+gringorten <- function(data){
+        grig <- (rank(data)-0.44)/(length(data)+0.12)
+        return(grig)
+}
+```
+
+```{r, echo=FALSE, results='hide',message=FALSE, warning=FALSE}
+grig <- gringorten(peakflow.sort)
+plot(peakflow.sort,grig,xlab="Peak Flow (cfs)",ylab="Probability",col="red")
+title("Prob Dis. of Annual Discharge Using Gringorten")
+```
+
+<br>  
+
+### Theoretical Cumulative Distribution Functions
+
+--- 
+
+Assuming stationarity, theoretical cumulative distribution functions for the annual peak flows assuming Normal, Log-normal, Gumbel and Generalized Extreme Value (GEV) distributions were developed. `fitdistr` in ***fitdistrplus*** package and `fevd` in ***extRemes*** package are the functions to fit Normal/Log_normal and Gumbel/GEV models to the peak flow data. The following graphs show the observed peak flow values versus the predicted values by Normal, Log-normal, Gumbel and GEV distribution models.
+
+\vspace{20pt}
+
+```{r, echo=FALSE, results='hide',message=FALSE, warning=FALSE}
+sf.nd<-fitdistr(peakflow.sort,"normal")
+q.nd<-qnorm(grig,sf.nd$estimate[1],sf.nd$estimate[2])
+plot(peakflow.sort,q.nd,xlab="Observed",ylab="Predicted")
+abline(0,1,col="gray")
+title("Peak Flow (cfs); Observed vs. Predicted by Normal Distribution")
+
+# Log-Normal Distribution
+
+sf.ln<-fitdistr(peakflow.sort,"Log-normal")
+q.ln<-qlnorm(grig,sf.ln$estimate[1],sf.ln$estimate[2])
+plot(peakflow.sort,q.ln,xlab="Observed",ylab="Predicted")
+abline(0,1,col="gray")
+title("Peak Flow (cfs); Observed vs. Predicted by Log-Normal Distribution")
+
+# Gumbel
+
+sf.gum <- fevd(peakflow,location.fun=~1,scale.fun=~1,shape.fun=0,type='Gumbel')
+q.gum<-qevd(grig,sf.gum$results$par[1],sf.gum$results$par[2],type='Gumbel')
+plot(peakflow.sort,q.gum,xlab="Observed",ylab="Predicted")
+abline(0,1,col="gray")
+title("Peak Flow (cfs); Observed vs. Predicted by Gumbel Distribution")
+
+
+# GEV
+
+sf.evd <- fevd(peakflow,location.fun=~1,scale.fun=~1,shape.fun=0,type='GEV')
+q.gev <- qevd(grig,sf.evd$results$par[1],sf.evd$results$par[2],
+              sf.evd$results$par[3],type='GEV')
+plot(peakflow.sort,q.gev,xlab="Observed",ylab="Predicted")
+abline(0,1,col="gray")
+title("Peak Flow (cfs); Observed vs. Predicted by GEV Distribution")
+```
+
+<br>
+
+According to the presented plots corresponding to each distribution model, GEV distribution model seems to be better fit to the observed data rather than the other three models. The GEV model has a better fit for late-temporal data as well.
+
+<br>  
+
+### 10, 50, and 100 Year Floods Discharges
+
+---
+
+Assuming stationarity, the discharges corresponding to 10, 50 and 100 year floods can be evaluated using distribution models developed before. Return period for any year can be obtained using the following function:
+
+```{r}
+
+ReturnPeriod <- function(YEAR){
+        rp <- 1-1/YEAR
+        return(rp)
+}
+```
+<br>
+The results for all the flood years and different distribution models has been presented in the following table:  
+<br>
+
+\vspace{20pt}
+
+```{r, echo=FALSE, results='hide',message=FALSE, warning=FALSE}
+Years <- c(10,50,100)
+q_nd <- vector()
+q_ln <- vector()
+q_gum <- vector()
+q_gev <- vector()
+
+for (i in Years){
+        q_nd <- c(q_nd,qnorm(ReturnPeriod(i),sf.nd$estimate[1],
+                             sf.nd$estimate[2]))        # normal
+        q_ln <- c(q_ln,qlnorm(ReturnPeriod(i),sf.ln$estimate[1],
+                              sf.ln$estimate[2]))       # log-norm
+        q_gum <- c(q_gum,qevd(ReturnPeriod(i),sf.gum$results$par[1],
+                              sf.gum$results$par[2],type='Gumbel'))         # Gumbel
+        q_gev <- c(q_gev,qevd(ReturnPeriod(i),sf.evd$results$par[1],sf.evd$results$par[2],
+                              sf.evd$results$par[3],type='GEV'))      # GEV
+}
+
+floods_cfs <- rbind(q_nd,q_ln,q_gum,q_gev)
+colnames(floods_cfs) <- c("10 Year","50 Year","100 Year")
+rownames(floods_cfs) <- c("Normal", "Log-normal", "Gumbel", "GEV")
+```
+<br>
+```{r,  echo=F, warning=F}
+library(knitr)
+kable(floods_cfs, caption = "Discharges (cfs) for 10, 50, 100 year flood")
+
+```
+
+
+<br>
+
+### Non-stationary Model  
+
+---
+
+
+In this part, a non-stationary GEV distribution model has been developed and fitted to the peak flow data assuming a linear temporal variation in
+
+- Location parameter alone
+- Location and scale parameters
+
+<br> 
+
+For this aim, the `location.fun` argument of the `fevd` function should be defined as a linear function of time (year). In stationarity model, all the parameters of GEV model should be constant. The non-stationary GEV model for the peak flow data are shown below:
+
+\vspace{20pt}
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+evd.fit.ns1 <- fevd(peakflow,dat,location.fun = ~hydyear)
+loc1 <- evd.fit.ns1$results$par[1]+evd.fit.ns1$results$par[2]*hydyear
+quan1 <- vector()
+for (i in seq(1,length(peakflow),1)){
+        quan1[i] <- qevd(grig[i],loc=loc1[i],evd.fit.ns1$results$par[3],
+                         evd.fit.ns1$results$par[4],type='GEV')
+}
+plot(quan1,grig,xlab="Peack Flow (cfs)",ylab="Probability")
+title("Non_Stationarity(Location) GEV Distribution Model")
+```
+
+<br>
+To compare the non-stationary and stationary models, the predicted peak flows for both models were plotted against each other. The plot is shown below:
+
+        
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+plot(q.gev,quan1,xlab="Stationariy Predicted Peack Flow (cfs)"
+     ,ylab="Non-Stationariy Predicted Peack Flow (cfs)")
+abline(0,1,col="gray")
+title("Stationarity vs. Non_Stationarity(Location)")
+
+```
+
+
+<br>
+
+The comparison between non-stationary and stationary GEV models shows similar trend for both. Visually the fit on the 45 degree line which means they are close to each other. However, they have differences which cannot be seen visually.  
+
+The model can be developed considering scale parameter of GEV distribution model to be as a function of time as well. The next two plots show the peak flow results of the non-stationarity model when location and scale parameters are a linear terporal functions.
+
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+
+evd.fit.ns2 <- fevd(peakflow,dat,location.fun = ~hydyear,scale.fun = ~hydyear)
+loc2 <- evd.fit.ns2$results$par[1]+evd.fit.ns2$results$par[2]*hydyear
+sca <- evd.fit.ns2$results$par[3]+evd.fit.ns2$results$par[4]*hydyear
+quan2 <- vector()
+for (i in seq(1,length(peakflow),1)){
+        quan2[i] <- qevd(grig[i],loc=loc2[i],scale=sca[i],
+                         evd.fit.ns2$results$par[5],type='GEV')
+}
+
+plot(quan2,grig,xlab="Peack Flow (cfs)",ylab="Probability")
+title("Non_Stationarity GEV Distribution Model(Location and scale)")
+
+plot(q.gev,quan2,xlab="Stationariy Predicted Peack Flow (cfs)",
+     ylab="Non-Stationariy Predicted Peack Flow (cfs)")
+abline(0,1,col="gray")
+title("Stationarity vs. Non_Stationarity(Location and Scale)")
+```
+
+\vspace{20pt}
+
+Same as the previous case, the non-stationary GEV model when location and scale parameters are changing by time is also very close to the stationary model. The following plot shows all the GEV models and empirical data:
+
+\vspace{20pt}
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+
+prob1 <- vector()
+prob2 <- vector()
+prob3 <- vector()
+
+for (i in seq(1,length(peakflow.sort),1)){
+        prob1[i] <- pevd(peakflow.sort[i],sf.evd$results$par[1],
+                         sf.evd$results$par[2],sf.evd$results$par[3],type='GEV')
+        prob2[i] <- pevd(peakflow.sort[i],loc=loc1[i],
+                         evd.fit.ns1$results$par[3],evd.fit.ns1$results$par[4],type='GEV')
+        prob3[i] <- pevd(peakflow.sort[i],loc=loc2[i],
+                         scale=sca[i],evd.fit.ns2$results$par[5],type='GEV')
+}
+
+plot(peakflow.sort,grig,xlab="Peak Flow (cfs)",ylab="Probability",col="red",pch=1)
+lines(peakflow.sort,prob1,xlab="Peak Flow (cfs)",ylab="Probability",col="green",lty=2)
+lines(peakflow.sort,prob2,xlab="Peak Flow (cfs)",ylab="Probability",col="blue",lty=3)
+lines(peakflow.sort,prob3,xlab="Peak Flow (cfs)",ylab="Probability",col="brown",lty=4)
+legend(1e4,0.4,legend=c("Empirical","Stationary GEV","Non-Stationary GEV(location only)",
+                      "Non-stationary GEV (location and scale)"),
+       lty=c(NA,2,3,4),col=c('red','green','blue','brown'),
+       pch=c(1,NA,NA,NA))
+
+```
+
+
+
+```{r, results='asis', echo=FALSE}
+cat("\\newpage")
+```
+
+
+<br> 
+
+### Flow Duration Curve
+
+---
+
+Flow curve duration can be used to obtain percentage of time that a particular discharge was equaled or exceeded. To evaluate the exceedance corresponding to the peak annual flood in the year 2011 (the driest single year in the recorded history of Texas), flow curve duration is constructed. Calculation of exceedance is done by applying Gringorten function to the data as following code indicates:  
+
+The Flow Duration Curve has been plotted as following:
+
+
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+# Load libraries
+library(zoo)
+library(forecast)
+library(xts)
+
+# Set working Directory 
+setwd('C:\\Users\\vahid\\Dropbox\\GraduateStudies\\Semester 6\\SurfaceWaterHydrology\\Module1\\RCode') # Need to change this as necessary
+```
+
+```{r, eval=F}
+# Remove zeros form stream-flow data
+Streamflow <- Streamflow[ Streamflow != 0 ] 
+
+# Calculate exceedance using Gringorten Formula
+N <- length(Streamflow) # Number of data
+Streamflow_rank <- rank(Streamflow) # rank of data
+exceedance <- 1 -(Streamflow_rank-0.44)/(N+0.12) # Gringorten distribution
+```
+<br>
+
+The flow curve duration is shown as follows:
+
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+a <- read.csv('Dailydata.csv')
+sf.data <- a[,4]
+date.x <- a[,3]
+date <- as.Date(date.x,"%m/%d/%Y")
+
+# Create a flow duration curve 
+# summary(sf.data) # check to see if there are any zeros
+# Remove zeros
+sf.data1 <- sf.data[ sf.data != 0 ] 
+
+# Calculate exceedance using Gringorten Formula
+N <- length(sf.data1)
+sf.order <- rank(sf.data1)
+exceed <- 1 -(sf.order-0.44)/(N+0.12)
+
+#Make a semi-log plot
+plot(exceed,sf.data1,log="y",ylab='Streamflow (cfs)',xlab='Exceedance',pch=20,
+     main="Flow Curve Duration")
+
+##  Put grid lines on the plot, using a light blue color ("lightsteelblue2")
+# Put grid lines on the Y-axis
+ypts <- seq(-2,5,1)
+for(i in seq(1,length(ypts)-1,1))
+{
+        seqa <- seq(10^ypts[i],10^ypts[i+1],10^ypts[i])
+        abline( h = seqa, lty = 3, col = colors()[ 440 ] )
+}
+# Put grid lines on X-axis
+xpts <- seq(0.0,1.0,0.1)
+for(j in seq(1,length(xpts),1))
+{
+        abline(v=xpts[j],col=colors()[440])
+}
+```
+
+
+
+\vspace{20pt}
+
+As an example, based on the flow duration curve, the maximum flow rate that is not exceeding 60 % of the time is approximately 20 cfs  
+
+The maximum flow that occured in 2011 is 1780 cfs. The corresponding exceedance to this flow is approximately 3 % or based on flow duration curve.
+
+<br>
+
+### Annual and Monthly Variation in the Stream-flow
+
+---
+
+Box-plot can be utlized to depict the intra-annual and intra-monthly variations in stream-flow. Box-plots was annual and monthly stream-flow are shown here:
+\vspace{20pt}
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+mon <- format(date,"%b")
+month <-factor(mon,levels=c('Jan','Feb','Mar','Apr','May','Jun',
+                            'Jul','Aug','Sep','Oct','Nov','Dec'))
+boxplot(as.numeric(sf.data)~month,outline=F,main="Intra-monthly Variation Box_plot",
+        xlab="Month",ylab="Flood (cfs)")
+
+Year <- format(date,"%Y")
+boxplot(as.numeric(sf.data)~Year,outline=F,main="Intra-annual Variation Box-plot",
+        xlab="Year",ylab="Flood (cfs)")
+```
+
+\vspace{20pt}
+
+The box-plot for intra monthly variations shows high variability for January. January is in winter, it is possible that some years experience very high flood and on the other hand some years may drought happens, causing high variation in the pick flow data.
+
+<br>
+
+Decomposition of  the data into seasonal, trend and noise components can be done using `stl` function in R. The following graph shows seasonal decomposition of time of stream-flow data:
+
+\vspace{20pt}
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE}
+jpeg(file = "SDT.jpg", bg = "transparent",height = 8,width = 11,units = "in",res=600)
+tss <- xts(sf.data,date)
+ts_m = as.vector(apply.monthly(tss, mean))
+Q.ts <- ts(ts_m,start=c(07,1944),end=c(12,2016),frequency=12)
+SDT <- stl(Q.ts,s.window = 12)
+
+plot(SDT,main="Seasonal Decomposition of Time")
+dev.off()
+```
+
+\vspace{20pt}
+
+
+Based on the plot of Seasonal Decomposition of Time, trend can show variation in flood better than seasonal plot. The trend plot is a pretty good representative variation in the data and it follows the same pattern which data has. But, seasonal plot does not show the variation in the flood data because it's pattern does not have similarity to the data plot and shows a repetitive set of fluctuations. For example at recent time, the annual trend is showing decrease in flood magnitude while seasonal trend is unable to represent this drought.
+
+\vspace{80pt}
+
+---
+
+
+
+
+```{r, results='asis', echo=FALSE}
+cat("\\newpage")
+```
+
+
+
